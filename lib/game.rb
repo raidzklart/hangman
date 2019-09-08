@@ -1,3 +1,5 @@
+require 'json'
+
 class Game
   attr_reader :word
   def initialize
@@ -6,9 +8,7 @@ class Game
     setup
   end
 
-  def guess_letter
-    puts "Guess a letter..."
-    letter = gets.chomp
+  def guess_letter(letter)
     correct = false
     @guesses -= 1
     @word.each_char.with_index do |c, i| 
@@ -23,8 +23,24 @@ class Game
   end
 
   def play
+    puts "You may load a previous game by typing: !l :id"
+    puts "You may also save the game at any time by typing: !s"
     while true
-      guess_letter
+      puts "Guess a letter..."
+      letter = gets.chomp
+      if letter.length > 1
+        if letter == "!s"
+          save_game
+          @guesses += 1
+        end
+        if letter.include? "!l"
+          id = letter.split(" ")[1]
+          load_game(id)
+          @guesses += 1
+        end
+      else
+        guess_letter(letter)
+      end
       if @guesses < 1
         puts "Unlucky, you didn't guess the word. It was: #{@word}"
         break
@@ -46,6 +62,14 @@ class Game
     end
   end
 
+  def to_json
+    JSON.dump ({
+      :word => @word,
+      :guessed => @guessed,
+      :guesses => @guesses
+    })
+  end
+
   private
   def pick_random_word
     @word = @lines.sample
@@ -53,12 +77,32 @@ class Game
     @word
   end
 
+  def save_game
+    Dir.mkdir("saved_games") unless Dir.exists? "saved_games"
+    id = Dir[File.join("saved_games", '**', '*')].count { |file| File.file?(file) }
+    filename = "saved_games/#{id}.json"
+
+    File.open(filename,'w') do |file|
+      file.puts self.to_json
+    end
+    exit!
+  end
+
+  def load_game(id)
+    path_to_file = "saved_games/#{id}.json"
+    file = JSON.load File.read (path_to_file)
+    puts file
+    @word = file["word"]
+    @guessed = file['guessed']
+    @guesses = file['guesses']
+    File.delete(path_to_file) if File.exist?(path_to_file)
+  end
+
   def setup
     @guesses = 6
-    @word = pick_random_word
+    @word = pick_random_word.chomp
     @guessed = ""
     @word.each_char { |c| @guessed += "_"}
-    @guessed[-1] = ''
   end
 
   def reset
